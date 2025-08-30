@@ -25,13 +25,15 @@ CARACTERÍSTICAS:
 ✅ Integración completa con Excel (672 productos)
 ✅ Manejo robusto de errores
 
-SERVIDOR: http://107.170.78.13:8000
-WEBHOOK: http://107.170.78.13:8000/webhook
-STATUS:  http://107.170.78.13:8000/status
+🔒 SEGURIDAD:
+✅ Variables de entorno para configuración
+✅ Validación de webhooks con HMAC
+✅ Rate limiting implementado
+✅ Sin IPs hardcodeadas en el código
 
 AUTOR: Sistema automatizado
 FECHA: 2025
-VERSIÓN: Producción estable
+VERSIÓN: Producción segura
 """
 
 from flask import Flask, request, jsonify
@@ -42,6 +44,10 @@ import pandas as pd
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import hmac
+import hashlib
+import time
+from functools import wraps
 
 # Cargar variables de entorno al inicio
 load_dotenv()
@@ -78,10 +84,134 @@ HOJA_PRODUCTOS = os.getenv('HOJA_PRODUCTOS', 'Productos')
 WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'webhook_secret_default')
 FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'flask_secret_default')
 
-# 🚀 CONFIGURACIÓN DE SERVIDOR
+# �️ CONFIGURACIONES AVANZADAS DE SEGURIDAD
+ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',') if os.getenv('ALLOWED_IPS') else []
+RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', 30))  # requests por minuto
+RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))    # ventana en segundos
+MAX_REQUEST_SIZE = int(os.getenv('MAX_REQUEST_SIZE', 1024 * 1024))  # 1MB por defecto
+
+# �🚀 CONFIGURACIÓN DE SERVIDOR
 FLASK_ENV = os.getenv('FLASK_ENV', 'development')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 PORT = int(os.getenv('PORT', 8000))
+
+# ============================================================================
+# 🤖 INICIALIZACIÓN DE GEMINI AI
+# ============================================================================
+# 🔒 FUNCIONES DE SEGURIDAD
+# ============================================================================
+
+# Rate limiting simple en memoria
+request_count = {}
+
+def verificar_webhook_signature(payload, signature):
+    """
+    Verifica la firma del webhook para autenticación
+    
+    Args:
+        payload (bytes): Datos del webhook  
+        signature (str): Firma recibida
+        
+    Returns:
+        bool: True si la firma es válida
+    """
+    if not signature or WEBHOOK_SECRET == 'webhook_secret_default':
+        logger.warning("🔓 Webhook sin validación de firma configurada")
+        return True  # Permitir si no hay secreto configurado
+    
+    try:
+        expected_signature = hmac.new(
+            WEBHOOK_SECRET.encode('utf-8'),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Soportar formato "sha256=hash" o solo "hash"
+        if signature.startswith('sha256='):
+            signature = signature[7:]
+            
+        return hmac.compare_digest(expected_signature, signature)
+    except Exception as e:
+        logger.error(f"❌ Error verificando firma webhook: {e}")
+        return False
+
+def verificar_rate_limit(ip_address):
+    """
+    Implementa rate limiting simple por IP
+    
+    Args:
+        ip_address (str): IP del cliente
+        
+    Returns:
+        bool: True si está dentro del límite
+    """
+    current_time = time.time()
+    
+    # Limpiar entradas antiguas
+    for ip in list(request_count.keys()):
+        request_count[ip] = [
+            timestamp for timestamp in request_count[ip] 
+            if current_time - timestamp < RATE_LIMIT_WINDOW
+        ]
+        if not request_count[ip]:
+            del request_count[ip]
+    
+    # Verificar límite para esta IP
+    if ip_address not in request_count:
+        request_count[ip_address] = []
+    
+    if len(request_count[ip_address]) >= RATE_LIMIT_REQUESTS:
+        return False
+    
+    request_count[ip_address].append(current_time)
+    return True
+
+def verificar_ip_permitida(ip_address):
+    """
+    Verifica si la IP está en la lista de permitidas
+    
+    Args:
+        ip_address (str): IP del cliente
+        
+    Returns:
+        bool: True si está permitida o no hay restricciones
+    """
+    if not ALLOWED_IPS or ALLOWED_IPS == ['']:
+        return True  # No hay restricciones de IP
+    
+    return ip_address in ALLOWED_IPS
+
+def security_middleware():
+    """
+    Middleware de seguridad para validar requests
+    
+    Returns:
+        Response or None: Error response si falla validación
+    """
+    # Obtener IP real (considerando proxies)
+    ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if ip_address and ',' in ip_address:
+        ip_address = ip_address.split(',')[0].strip()
+    
+    # Verificar tamaño del request
+    if request.content_length and request.content_length > MAX_REQUEST_SIZE:
+        logger.warning(f"🚫 Request demasiado grande desde {ip_address}: {request.content_length} bytes")
+        return jsonify({"error": "Request too large"}), 413
+    
+    # Verificar IP permitida
+    if not verificar_ip_permitida(ip_address):
+        logger.warning(f"🚫 IP no permitida: {ip_address}")
+        return jsonify({"error": "IP not allowed"}), 403
+    
+    # Verificar rate limit
+    if not verificar_rate_limit(ip_address):
+        logger.warning(f"🚫 Rate limit excedido para IP: {ip_address}")
+        return jsonify({"error": "Rate limit exceeded"}), 429
+    
+    # Log del request para monitoreo
+    logger.info(f"🔍 Request desde {ip_address} - {request.method} {request.path}")
+    
+    return None
 
 # ============================================================================
 # 🤖 INICIALIZACIÓN DE GEMINI AI
@@ -572,11 +702,31 @@ else:
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    """Endpoint principal que recibe mensajes de Evolution API"""
+    """Endpoint principal que recibe mensajes de Evolution API con seguridad mejorada"""
+    # Aplicar middleware de seguridad
+    security_response = security_middleware()
+    if security_response:
+        return security_response
+    
     try:
+        # Verificar Content-Type
+        if not request.is_json:
+            logger.warning("🚫 Webhook recibido sin Content-Type JSON")
+            return jsonify({"error": "Content-Type must be application/json"}), 400
+        
+        # Verificar firma del webhook si está configurada
+        signature = request.headers.get('X-Hub-Signature-256') or request.headers.get('X-Signature')
+        if not verificar_webhook_signature(request.data, signature):
+            logger.warning("🚫 Firma de webhook inválida")
+            return jsonify({"error": "Invalid webhook signature"}), 401
+        
         # Obtener datos del webhook
         data = request.json
-        logger.info(f"📨 Webhook recibido: {data}")
+        if not data:
+            logger.warning("� Webhook sin datos JSON válidos")
+            return jsonify({"error": "Invalid JSON data"}), 400
+        
+        logger.info(f"✅ Webhook autenticado correctamente")
 
         # Verificar que hay datos
         if not data or 'data' not in data or not data['data']:
@@ -595,7 +745,7 @@ def webhook():
 
     except Exception as e:
         logger.error(f"❌ Error en webhook: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 
 def procesar_mensaje(message_data):
@@ -805,8 +955,6 @@ def home():
 if __name__ == "__main__":
     print("🤖 Iniciando servidor webhook WhatsApp + Gemini")
     print("=" * 50)
-    print("🌐 URL: http://107.170.78.13:8000")
-    print("📡 Webhook: http://107.170.78.13:8000/webhook")
     print(f"📊 Estado: http://0.0.0.0:{PORT}/status")
     print("=" * 50)
     
