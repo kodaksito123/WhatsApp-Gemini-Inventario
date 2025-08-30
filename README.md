@@ -95,11 +95,8 @@ pip install -r requirements_whatsapp.txt
 python servidor_webhook.py
 ```
 
-### 3. Configurar Webhook en Evolution API
 
-El webhook debe apuntar a: `http://107.170.78.13:8000/webhook`
-
-### 4. Uso del Bot
+### 3. Uso del Bot
 
 1. **Iniciar sesión**: Enviar `/inventario` por WhatsApp
 2. **Hacer consultas**: Cualquier pregunta sobre productos
@@ -128,6 +125,4 @@ El webhook debe apuntar a: `http://107.170.78.13:8000/webhook`
 
 El bot entiende consultas naturales:
 
-- "Algo bonito para mi mamá" → Encuentra joyas, perfumes, etc.
-- "Para el frío" → Encuentra chamarras, mantas, etc.
-- "Cámara para galpón 20x20" → Busca por características
+- "Cámara de 8mp para galpón 20x20" → Busca por características
