@@ -1,0 +1,6 @@
+google-generativeai
+flask
+requests
+pandas
+openpyxl
+python-dotenv

@@ -1,0 +1,144 @@
+# 🔐 ARCHIVOS SENSIBLES - NO SUBIR A GITHUB
+# ==========================================
+
+# Variables de entorno con datos sensibles
+.env
+.env.local
+.env.production
+.env.staging
+
+# API Keys y configuraciones sensibles
+config.json
+secrets.json
+*.key
+*.pem
+
+# 📊 ARCHIVOS DE DATOS EMPRESARIALES
+# ==================================
+
+# Archivos Excel con inventario real
+*.xlsx
+*.xls
+Inventario_*.xlsx
+bd_CLIENTES.xlsx
+V2*.xlsx
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# 📝 LOGS Y CACHE
+# ===============
+
+# Logs del sistema
+*.log
+logs/
+*.log.*
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribución / empaquetado
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 🔧 HERRAMIENTAS DE DESARROLLO
+# =============================
+
+# Entornos virtuales
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# 🌐 WEB Y DESPLIEGUE
+# ===================
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# 🔄 TEMPORALES
+# =============
+
+# Archivos temporales del sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archivos de backup
+*.bak
+*.backup
+*.tmp
+
+# 📱 ESPECÍFICOS DEL PROYECTO
+# ===========================
+
+# Archivos de sesiones activas (si los hubiera)
+sessions/
+temp/
+uploads/
+
+# Configuraciones específicas de producción
+production_config.py
+prod_settings.py
